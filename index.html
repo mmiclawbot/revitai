@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Revit Coordinate Alignment Tool — Stop Fighting Shared Coordinates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0f1a;
+      --bg-card: #111827;
+      --bg-card-hover: #1a2234;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-purple: #8b5cf6;
+      --accent-orange: #f97316;
+      --text-white: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --border: rgba(148, 163, 184, 0.1);
+      --glow-blue: rgba(59, 130, 246, 0.4);
+      --glow-cyan: rgba(6, 182, 212, 0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-white);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    .bg-grid {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow-1 {
+      top: -200px;
+      right: -100px;
+      background: var(--accent-blue);
+    }
+
+    .bg-glow-2 {
+      bottom: 20%;
+      left: -200px;
+      background: var(--accent-purple);
+      opacity: 0.25;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Navigation */
+    nav {
+      padding: 20px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 10;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text-white);
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-white);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      color: white;
+      box-shadow: 0 4px 20px var(--glow-blue);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px var(--glow-blue);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-card);
+      color: var(--text-white);
+      border-color: rgba(148, 163, 184, 0.2);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 80px 0 120px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-bottom: 32px;
+    }
+
+    .hero-badge::before {
+      content: "✨";
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      max-width: 640px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      padding-top: 48px;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Problem Section */
+    .section {
+      padding: 100px 0;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .section-tag {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(249, 115, 22, 0.1);
+      border: 1px solid rgba(249, 115, 22, 0.2);
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-orange);
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .section-header h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .section-header p {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Pain Cards */
+    .pain-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .pain-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      transition: all 0.3s ease;
+    }
+
+    .pain-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(249, 115, 22, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .pain-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(249, 115, 22, 0.1);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+
+    .pain-card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .pain-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* Solution Section */
+    .solution {
+      background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.03), transparent);
+    }
+
+    .solution-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .solution-content h2 {
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .solution-content p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .feature-check {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .feature-check::after {
+      content: "✓";
+      color: white;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .feature-list li strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 1rem;
+    }
+
+    .feature-list li span {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Demo Card */
+    .demo-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .demo-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan), var(--accent-purple));
+    }
+
+    .demo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .demo-title {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .demo-steps {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      padding: 6px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: 100px;
+    }
+
+    .demo-step {
+      display: flex;
+      gap: 16px;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 16px;
+      margin-bottom: 12px;
+      border: 1px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .demo-step:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .demo-step:last-child {
+      margin-bottom: 0;
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .step-content strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+    }
+
+    .step-content span {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .demo-badges {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .demo-badge {
+      padding: 8px 14px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      margin-bottom: 20px;
+    }
+
+    .feature-card h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    /* Social Proof */
+    .proof {
+      text-align: center;
+    }
+
+    .proof-card {
+      background: linear-gradient(135deg, var(--bg-card), rgba(59, 130, 246, 0.05));
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 64px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .proof-card::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.08), transparent 50%);
+      pointer-events: none;
+    }
+
+    .proof-number {
+      font-size: 4rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+
+    .proof-label {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .proof-desc {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* CTA Section */
+    .cta {
+      padding: 120px 0;
+    }
+
+    .cta-card {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1));
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 32px;
+      padding: 80px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-card::before {
+      content: "";
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 300px;
+      height: 300px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.3;
+    }
+
+    .cta-card::after {
+      content: "";
+      position: absolute;
+      bottom: -100px;
+      left: -100px;
+      width: 300px;
+      height: 300px;
+      background: var(--accent-purple);
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.2;
+    }
+
+    .cta-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .cta p {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      max-width: 500px;
+      margin: 0 auto 32px;
+    }
+
+    .cta .btn-primary {
+      padding: 18px 40px;
+      font-size: 1.05rem;
+    }
+
+    .cta-note {
+      margin-top: 20px;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    footer p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .solution-grid {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+
+      .hero-stats {
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero {
+        padding: 60px 0 80px;
+      }
+
+      .section {
+        padding: 60px 0;
+      }
+
+      .pain-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-card {
+        padding: 48px 24px;
+      }
+
+      .proof-card {
+        padding: 40px 24px;
+      }
+
+      .proof-number {
+        font-size: 3rem;
+      }
+    }
+
+    /* Animations */
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .demo-card {
+      animation: float 6s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <div class="container">
+    <nav>
+      <div class="logo">
+        <div class="logo-icon">📐</div>
+        <span>CoordAlign</span>
+      </div>
+      <div class="nav-links">
+        <a href="#problem">The Problem</a>
+        <a href="#solution">Solution</a>
+        <a href="#features">Features</a>
+        <a class="btn btn-primary" href="#waitlist">Join Waitlist</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="hero-badge">For Revit Users & BIM Managers</div>
+      <h1>
+        Stop Fighting<br>
+        <span class="gradient">Shared Coordinates</span>
+      </h1>
+      <p class="hero-subtitle">
+        Hours wasted debugging survey points? Linked models jumping around? 
+        There's a better way. One-click coordinate alignment for Revit that actually works.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#waitlist">Get Early Access →</a>
+        <a class="btn btn-ghost" href="#solution">See How It Works</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-value">509</div>
+          <div class="stat-label">Reddit complaints analyzed</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">20+</div>
+          <div class="stat-label">Years of coordinate pain</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">3</div>
+          <div class="stat-label">Steps to alignment</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="section" id="problem">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag">The Problem</div>
+        <h2>Why Coordinates Still Suck in 2026</h2>
+        <p>After two decades, shared coordinates remain one of Revit's biggest headaches.</p>
+      </div>
+
+      <div class="pain-grid">
+        <div class="pain-card">
+          <div class="pain-icon">😵‍💫</div>
+          <h3>Linked Models Go Rogue</h3>
+          <p>One bad publish or import and suddenly your architecture, structure, and MEP models are misaligned by meters. Hours of work undone.</p>
+        </div>
+        <div class="pain-card">
+          <div class="pain-icon">📚</div>
+          <h3>Tribal Knowledge Chaos</h3>
+          <p>Every project has its own coordinate workflow passed down like folklore. New team members? Good luck figuring it out.</p>
+        </div>
+        <div class="pain-card">
+          <div class="pain-icon">🔧</div>
+          <h3>BIM Managers Become Help Desk</h3>
+          <p>Instead of enforcing standards, you're constantly troubleshooting the same coordinate issues across project after project.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section solution" id="solution">
+    <div class="container">
+      <div class="solution-grid">
+        <div class="solution-content">
+          <div class="section-tag">The Solution</div>
+          <h2>Coordinates Made Boring</h2>
+          <p>
+            A guided wizard that turns coordinate alignment from a scary ritual into a 
+            predictable 3-step process. No more guessing, no more tribal knowledge.
+          </p>
+          <ul class="feature-list">
+            <li>
+              <div class="feature-check"></div>
+              <div>
+                <strong>One-Click Alignment</strong>
+                <span>Detect, choose target, apply. Done in minutes, not hours.</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-check"></div>
+              <div>
+                <strong>See Before You Commit</strong>
+                <span>Preview changes before making them. No surprises.</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-check"></div>
+              <div>
+                <strong>Same Process, Every Time</strong>
+                <span>Standardize your team's workflow. New hires ramp up fast.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="demo-card">
+          <div class="demo-header">
+            <div class="demo-title">Alignment Wizard</div>
+            <div class="demo-steps">3 steps</div>
+          </div>
+
+          <div class="demo-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <strong>Detect Current State</strong>
+              <span>Auto-scan linked files, survey points, and base points.</span>
+            </div>
+          </div>
+
+          <div class="demo-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <strong>Choose Target Alignment</strong>
+              <span>Pick host model, survey source, or approved standard.</span>
+            </div>
+          </div>
+
+          <div class="demo-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <strong>Apply & Verify</strong>
+              <span>Review results, then commit with confidence.</span>
+            </div>
+          </div>
+
+          <div class="demo-badges">
+            <span class="demo-badge">One-click</span>
+            <span class="demo-badge">Audit-ready</span>
+            <span class="demo-badge">Team-friendly</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag">Features</div>
+        <h2>Built for BIM Managers</h2>
+        <p>Everything you need to standardize coordinate workflows across your team.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🎯</div>
+          <h3>Guided Wizard</h3>
+          <p>Step-by-step prompts remove guesswork from a process most users only touch a few times per year.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔍</div>
+          <h3>Auto Diagnostics</h3>
+          <p>Instantly identify mismatched base points, survey data conflicts, and common alignment issues.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">👁️</div>
+          <h3>Preview Mode</h3>
+          <p>See exactly what will change before you apply it. No more "hope this works" moments.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📋</div>
+          <h3>Standardized Workflow</h3>
+          <p>Replace ad-hoc instructions with a repeatable process for every model setup.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Safe by Default</h3>
+          <p>Built-in safeguards prevent common mistakes. Undo support for peace of mind.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Audit Trail</h3>
+          <p>Log every alignment action. Know who changed what and when for project records.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section proof">
+    <div class="container">
+      <div class="proof-card">
+        <div class="proof-number">509</div>
+        <div class="proof-label">Reddit Comments Analyzed</div>
+        <p class="proof-desc">
+          This tool's messaging is grounded in real complaints, recurring confusion, 
+          and genuine pain points shared by Revit users over years of forum discussions.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="waitlist">
+    <div class="container">
+      <div class="cta-card">
+        <div class="cta-content">
+          <h2>Ready to Fix Your Coordinates?</h2>
+          <p>Join the waitlist and be first to get access when we launch. No spam, just updates.</p>
+          <a class="btn btn-primary" href="mailto:hello@example.com?subject=Join%20Waitlist%20-%20CoordAlign">
+            Join Waitlist →
+          </a>
+          <p class="cta-note">Built for BIM managers, coordinators, and Revit power users.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>© 2026 CoordAlign — Making Revit coordinates boring since day one.</p>
+    </div>
+  </footer>
+</body>
+</html>
